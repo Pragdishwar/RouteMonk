@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://neondb_owner:npg_hm1X0PMrwRoD@ep-lucky-pond-a1r4a2zg-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+    depends_on: []
