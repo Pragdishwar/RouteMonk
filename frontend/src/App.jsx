@@ -34,3 +34,5 @@ const handleSubmit = async (e) => {
     alert("Optimization failed");
   }
 };
+export default App;
+
