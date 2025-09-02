@@ -14,8 +14,9 @@ function App() {
 
   // Fetch delivery history on load
   useEffect(() => {
-    axios.get("http://127.0.0.1:8000/history/")
-      .then(res => setHistory(res.data))
+    axios
+      .get("https://routemonk-backend.onrender.com/history/")
+      .then((res) => setHistory(res.data.history || []))
       .catch(() => console.log("History fetch failed"));
   }, []);
 
@@ -27,25 +28,34 @@ function App() {
     }
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/optimize/", null, {
-        params: {
-          start_lat: start.lat,
-          start_lon: start.lng,
-          end_lat: end.lat,
-          end_lon: end.lng,
-          perishability,
-          city,
-        },
-      });
+      const res = await axios.post(
+        "https://routemonk-backend.onrender.com/optimize/",
+        null,
+        {
+          params: {
+            start: `${start.lat},${start.lng}`,
+            end: `${end.lat},${end.lng}`,
+            perishability: Number(perishability),
+            city,
+          },
+        }
+      );
       setResult(res.data);
 
       // refresh history
-      const histRes = await axios.get("http://127.0.0.1:8000/history/");
-      setHistory(histRes.data);
-
+      const histRes = await axios.get(
+        "https://routemonk-backend.onrender.com/history/"
+      );
+      setHistory(histRes.data.history || []);
     } catch (err) {
       console.error(err);
-      alert("Optimization failed");
+      if (err.response?.status === 422) {
+        alert("Invalid coordinates or city. Please check your input.");
+      } else if (err.response?.status === 500) {
+        alert("Server error. Please check backend and try again.");
+      } else {
+        alert("Optimization failed");
+      }
     }
   };
 
@@ -54,11 +64,11 @@ function App() {
       <h1 className="text-3xl font-bold text-center">🚚 RouteMonk</h1>
 
       {/* Map Selector */}
-      <MapSelector 
+      <MapSelector
         onPick={(coords, type) => {
           if (type === "start") setStart(coords);
           if (type === "end") setEnd(coords);
-        }} 
+        }}
         onRoute={(summary) => setRouteSummary(summary)}
       />
 
@@ -73,21 +83,21 @@ function App() {
 
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input 
-          type="text" 
-          placeholder="City" 
+        <input
+          type="text"
+          placeholder="City"
           value={city}
           onChange={(e) => setCity(e.target.value)}
           className="border p-2 w-full rounded"
         />
-        <input 
+        <input
           type="number"
           placeholder="Perishability (1-10)"
           value={perishability}
-          onChange={(e) => setPerishability(e.target.value)}
+          onChange={(e) => setPerishability(Number(e.target.value))}
           className="border p-2 w-full rounded"
         />
-        <select 
+        <select
           value={vehicle}
           onChange={(e) => setVehicle(e.target.value)}
           className="border p-2 w-full rounded"
@@ -96,7 +106,10 @@ function App() {
           <option value="van">Van</option>
           <option value="bike">Bike</option>
         </select>
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
           Optimize Route
         </button>
       </form>
@@ -105,7 +118,7 @@ function App() {
       {result && (
         <div className="p-4 bg-green-100 rounded">
           <h2 className="font-bold">✅ Optimized Result</h2>
-          <p>Travel Time: {Math.round(result.travel_time_sec/60)} min</p>
+          <p>Travel Time: {Math.round(result.travel_time_sec / 60)} min</p>
           <p>Weather: {result.weather}</p>
           <p>Final Score: {result.final_score}</p>
         </div>
@@ -117,19 +130,24 @@ function App() {
         <table className="w-full border mt-2">
           <thead>
             <tr className="bg-gray-200">
-              <th>ID</th><th>City</th><th>Time (min)</th><th>Weather</th><th>Score</th>
+              <th>ID</th>
+              <th>City</th>
+              <th>Time (min)</th>
+              <th>Weather</th>
+              <th>Score</th>
             </tr>
           </thead>
           <tbody>
-            {history.map((h) => (
-              <tr key={h.id} className="text-center border">
-                <td>{h.id}</td>
-                <td>{h.city}</td>
-                <td>{Math.round(h.travel_time_sec/60)}</td>
-                <td>{h.weather}</td>
-                <td>{h.final_score}</td>
-              </tr>
-            ))}
+            {Array.isArray(history) &&
+              history.map((h, index) => (
+                <tr key={h[0] || index} className="text-center border">
+                  <td>{h[0]}</td>
+                  <td>{h[1]}</td>
+                  <td>{Math.round(h[2] / 60)}</td>
+                  <td>{h[3]}</td>
+                  <td>{h[4]}</td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
