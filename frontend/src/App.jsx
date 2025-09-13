@@ -2,11 +2,28 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import MapSelector from "./MapSelector";
 
+// Helper function to format time to IST
+const formatToIST = (utcDateString) => {
+  if (!utcDateString) return 'Unknown';
+  try {
+    return new Date(utcDateString).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  } catch (e) {
+    return 'Invalid Date';
+  }
+};
+
 function App() {
   const [start, setStart] = useState(null);
   const [end, setEnd] = useState(null);
   const [perishability, setPerishability] = useState(5);
-  const [city, setCity] = useState("");
   const [vehicle, setVehicle] = useState("truck");
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
@@ -33,12 +50,12 @@ function App() {
     }
 
     try {
-      // Send JSON body data (matching your deployed backend)
+      // Send JSON body data - NO CITY REQUIRED, just coordinates and perishability
       const requestData = {
-        city: city,
         perishability: Number(perishability),
         start: `${start.lat},${start.lng}`,
         end: `${end.lat},${end.lng}`
+        // No more manual city input!
       };
 
       console.log("Sending request data:", requestData);
@@ -68,7 +85,7 @@ function App() {
       console.error("Error response:", err.response?.data);
       
       if (err.response?.status === 422) {
-        alert("Invalid input data. Please check your coordinates and city name.");
+        alert("Invalid input data. Please check your map selections.");
       } else if (err.response?.status === 500) {
         alert("Server error. Please try again later.");
       } else if (err.code === 'ERR_NETWORK') {
@@ -82,6 +99,9 @@ function App() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold text-center mb-6">🚚 RouteMonk</h1>
+      <p className="text-center text-gray-600 mb-4">
+        Click on the map to set your start and destination points. Weather will be automatically detected!
+      </p>
 
       {/* Map Selector */}
       <MapSelector
@@ -101,16 +121,16 @@ function App() {
         </div>
       )}
 
-      {/* Input Form */}
+      {/* Show selected coordinates */}
+      {(start || end) && (
+        <div className="bg-gray-100 p-3 rounded mb-4 text-sm">
+          {start && <p>📍 <strong>Start:</strong> {start.lat.toFixed(4)}, {start.lng.toFixed(4)}</p>}
+          {end && <p>🏁 <strong>End:</strong> {end.lat.toFixed(4)}, {end.lng.toFixed(4)}</p>}
+        </div>
+      )}
+
+      {/* Input Form - NO CITY INPUT NEEDED! */}
       <form onSubmit={handleSubmit} className="bg-gray-100 p-4 rounded mb-4">
-        <input
-          type="text"
-          placeholder="City (e.g., Mumbai, Chennai, Bengaluru)"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          className="border p-2 w-full rounded mb-2"
-          required
-        />
         <input
           type="number"
           placeholder="Perishability (1-10)"
@@ -132,7 +152,7 @@ function App() {
         <button
           type="submit"
           className="bg-blue-500 text-white p-2 rounded w-full hover:bg-blue-600"
-          disabled={!start || !end || !city}
+          disabled={!start || !end}
         >
           Optimize Route
         </button>
@@ -142,9 +162,10 @@ function App() {
       {result && (
         <div className="bg-green-100 p-4 rounded mb-4">
           <h3 className="font-bold mb-2">✅ Optimized Result</h3>
-          <p><strong>City:</strong> {result.city}</p>
+          <p><strong>Location:</strong> {result.city}</p>
           <p><strong>Travel Time:</strong> {Math.round(result.travel_time_sec / 60)} min</p>
           <p><strong>Weather:</strong> {result.weather || 'Unknown'}</p>
+          {result.temperature && <p><strong>Temperature:</strong> {result.temperature}°C</p>}
           <p><strong>Final Score:</strong> {result.final_score?.toFixed?.(2) || result.final_score}</p>
         </div>
       )}
@@ -158,18 +179,18 @@ function App() {
               <thead>
                 <tr className="bg-gray-200">
                   <th className="border p-2">ID</th>
-                  <th className="border p-2">City</th>
+                  <th className="border p-2">Location</th>
                   <th className="border p-2">Time (min)</th>
                   <th className="border p-2">Weather</th>
                   <th className="border p-2">Score</th>
+                  <th className="border p-2">Created At (IST)</th>
                 </tr>
               </thead>
               <tbody>
                 {history.map((h, index) => {
                   // Database columns: [id, city, perishability, travel_time_sec, weather, final_score, created_at]
-                  // Correct mapping:
                   const id = h[0];
-                  const city = h[1]; 
+                  const location = h[1]; 
                   const perishability = h[2];
                   const travel_time_sec = h[3];
                   const weather = h[4];
@@ -179,10 +200,11 @@ function App() {
                   return (
                     <tr key={index} className="hover:bg-gray-100">
                       <td className="border p-2">{id}</td>
-                      <td className="border p-2">{city}</td>
+                      <td className="border p-2">{location}</td>
                       <td className="border p-2">{Math.round(travel_time_sec / 60)}</td>
                       <td className="border p-2">{weather || 'Unknown'}</td>
                       <td className="border p-2">{typeof final_score === 'number' ? final_score.toFixed(2) : final_score}</td>
+                      <td className="border p-2">{formatToIST(created_at)}</td>
                     </tr>
                   );
                 })}
