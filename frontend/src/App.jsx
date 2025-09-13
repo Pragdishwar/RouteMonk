@@ -28,18 +28,26 @@ function App() {
     }
 
     try {
+      // Send JSON body data (matching your deployed backend)
+      const requestData = {
+        city: city,
+        perishability: Number(perishability),
+        start: `${start.lat},${start.lng}`,
+        end: `${end.lat},${end.lng}`
+      };
+
+      console.log("Sending request data:", requestData);
+
       const res = await axios.post(
         "https://routemonk-backend.onrender.com/optimize/",
-        null,
+        requestData,  // JSON body instead of params
         {
-          params: {
-            start: `${start.lat},${start.lng}`,
-            end: `${end.lat},${end.lng}`,
-            perishability: Number(perishability),
-            city,
-          },
+          headers: {
+            'Content-Type': 'application/json',
+          }
         }
       );
+      
       setResult(res.data);
 
       // refresh history
@@ -47,21 +55,26 @@ function App() {
         "https://routemonk-backend.onrender.com/history/"
       );
       setHistory(histRes.data.history || []);
+      
     } catch (err) {
-      console.error(err);
+      console.error("Full error:", err);
+      console.error("Error response:", err.response?.data);
+      
       if (err.response?.status === 422) {
-        alert("Invalid coordinates or city. Please check your input.");
+        alert("Invalid input data. Please check your coordinates and city name.");
       } else if (err.response?.status === 500) {
-        alert("Server error. Please check backend and try again.");
+        alert("Server error. Please try again later.");
+      } else if (err.code === 'ERR_NETWORK') {
+        alert("Cannot connect to backend server.");
       } else {
-        alert("Optimization failed");
+        alert(`Request failed: ${err.response?.status || 'Unknown'} - ${err.message}`);
       }
     }
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-3xl font-bold text-center">🚚 RouteMonk</h1>
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold text-center mb-6">🚚 RouteMonk</h1>
 
       {/* Map Selector */}
       <MapSelector
@@ -74,33 +87,36 @@ function App() {
 
       {/* Route Summary */}
       {routeSummary && (
-        <div className="p-4 bg-yellow-100 rounded">
-          <h2 className="font-bold">🛣️ Route Info</h2>
+        <div className="bg-blue-100 p-4 rounded mb-4">
+          <h3 className="font-bold mb-2">🛣️ Route Info</h3>
           <p>ETA: {Math.round(routeSummary.travelTimeInSeconds / 60)} min</p>
           <p>Distance: {(routeSummary.lengthInMeters / 1000).toFixed(2)} km</p>
         </div>
       )}
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="bg-gray-100 p-4 rounded mb-4">
         <input
           type="text"
-          placeholder="City"
+          placeholder="City (e.g., Mumbai, Chennai, Delhi)"
           value={city}
           onChange={(e) => setCity(e.target.value)}
-          className="border p-2 w-full rounded"
+          className="border p-2 w-full rounded mb-2"
+          required
         />
         <input
           type="number"
           placeholder="Perishability (1-10)"
+          min="1"
+          max="10"
           value={perishability}
           onChange={(e) => setPerishability(Number(e.target.value))}
-          className="border p-2 w-full rounded"
+          className="border p-2 w-full rounded mb-2"
         />
         <select
           value={vehicle}
           onChange={(e) => setVehicle(e.target.value)}
-          className="border p-2 w-full rounded"
+          className="border p-2 w-full rounded mb-2"
         >
           <option value="truck">Truck</option>
           <option value="van">Van</option>
@@ -108,7 +124,8 @@ function App() {
         </select>
         <button
           type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          className="bg-blue-500 text-white p-2 rounded w-full hover:bg-blue-600"
+          disabled={!start || !end || !city}
         >
           Optimize Route
         </button>
@@ -116,40 +133,46 @@ function App() {
 
       {/* Optimization Result */}
       {result && (
-        <div className="p-4 bg-green-100 rounded">
-          <h2 className="font-bold">✅ Optimized Result</h2>
-          <p>Travel Time: {Math.round(result.travel_time_sec / 60)} min</p>
-          <p>Weather: {result.weather}</p>
-          <p>Final Score: {result.final_score}</p>
+        <div className="bg-green-100 p-4 rounded mb-4">
+          <h3 className="font-bold mb-2">✅ Optimized Result</h3>
+          <p><strong>City:</strong> {result.city}</p>
+          <p><strong>Travel Time:</strong> {Math.round(result.travel_time_sec / 60)} min</p>
+          <p><strong>Weather:</strong> {result.weather}</p>
+          <p><strong>Final Score:</strong> {result.final_score?.toFixed?.(2) || result.final_score}</p>
         </div>
       )}
 
       {/* History */}
-      <div>
-        <h2 className="font-bold text-xl">📜 Past Deliveries</h2>
-        <table className="w-full border mt-2">
-          <thead>
-            <tr className="bg-gray-200">
-              <th>ID</th>
-              <th>City</th>
-              <th>Time (min)</th>
-              <th>Weather</th>
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.isArray(history) &&
-              history.map((h, index) => (
-                <tr key={h[0] || index} className="text-center border">
-                  <td>{h[0]}</td>
-                  <td>{h[1]}</td>
-                  <td>{Math.round(h[2] / 60)}</td>
-                  <td>{h[3]}</td>
-                  <td>{h[4]}</td>
+      <div className="bg-gray-50 p-4 rounded">
+        <h3 className="font-bold mb-4">📜 Past Deliveries</h3>
+        {Array.isArray(history) && history.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse border">
+              <thead>
+                <tr className="bg-gray-200">
+                  <th className="border p-2">ID</th>
+                  <th className="border p-2">City</th>
+                  <th className="border p-2">Time (min)</th>
+                  <th className="border p-2">Weather</th>
+                  <th className="border p-2">Score</th>
                 </tr>
-              ))}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {history.map((h, index) => (
+                  <tr key={index} className="hover:bg-gray-100">
+                    <td className="border p-2">{h[0]}</td>
+                    <td className="border p-2">{h[1]}</td>
+                    <td className="border p-2">{Math.round(h[2] / 60)}</td>
+                    <td className="border p-2">{h[3]}</td>
+                    <td className="border p-2">{typeof h[4] === 'number' ? h[4].toFixed(2) : h[4]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-gray-500">No delivery history yet. Complete your first route optimization!</p>
+        )}
       </div>
     </div>
   );
