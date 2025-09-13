@@ -16,8 +16,13 @@ function App() {
   useEffect(() => {
     axios
       .get("https://routemonk-backend.onrender.com/history/")
-      .then((res) => setHistory(res.data.history || []))
-      .catch(() => console.log("History fetch failed"));
+      .then((res) => {
+        console.log("History response:", res.data);
+        setHistory(res.data.history || []);
+      })
+      .catch((err) => {
+        console.log("History fetch failed:", err);
+      });
   }, []);
 
   const handleSubmit = async (e) => {
@@ -40,7 +45,7 @@ function App() {
 
       const res = await axios.post(
         "https://routemonk-backend.onrender.com/optimize/",
-        requestData,  // JSON body instead of params
+        requestData,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -48,12 +53,14 @@ function App() {
         }
       );
       
+      console.log("Optimization result:", res.data);
       setResult(res.data);
 
       // refresh history
       const histRes = await axios.get(
         "https://routemonk-backend.onrender.com/history/"
       );
+      console.log("Updated history:", histRes.data);
       setHistory(histRes.data.history || []);
       
     } catch (err) {
@@ -98,7 +105,7 @@ function App() {
       <form onSubmit={handleSubmit} className="bg-gray-100 p-4 rounded mb-4">
         <input
           type="text"
-          placeholder="City (e.g., Mumbai, Chennai, Delhi)"
+          placeholder="City (e.g., Mumbai, Chennai, Bengaluru)"
           value={city}
           onChange={(e) => setCity(e.target.value)}
           className="border p-2 w-full rounded mb-2"
@@ -137,7 +144,7 @@ function App() {
           <h3 className="font-bold mb-2">✅ Optimized Result</h3>
           <p><strong>City:</strong> {result.city}</p>
           <p><strong>Travel Time:</strong> {Math.round(result.travel_time_sec / 60)} min</p>
-          <p><strong>Weather:</strong> {result.weather}</p>
+          <p><strong>Weather:</strong> {result.weather || 'Unknown'}</p>
           <p><strong>Final Score:</strong> {result.final_score?.toFixed?.(2) || result.final_score}</p>
         </div>
       )}
@@ -158,15 +165,27 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {history.map((h, index) => (
-                  <tr key={index} className="hover:bg-gray-100">
-                    <td className="border p-2">{h[0]}</td>
-                    <td className="border p-2">{h[1]}</td>
-                    <td className="border p-2">{Math.round(h[2] / 60)}</td>
-                    <td className="border p-2">{h[3]}</td>
-                    <td className="border p-2">{typeof h[4] === 'number' ? h[4].toFixed(2) : h[4]}</td>
-                  </tr>
-                ))}
+                {history.map((h, index) => {
+                  // Database columns: [id, city, perishability, travel_time_sec, weather, final_score, created_at]
+                  // Correct mapping:
+                  const id = h[0];
+                  const city = h[1]; 
+                  const perishability = h[2];
+                  const travel_time_sec = h[3];
+                  const weather = h[4];
+                  const final_score = h[5];
+                  const created_at = h[6];
+                  
+                  return (
+                    <tr key={index} className="hover:bg-gray-100">
+                      <td className="border p-2">{id}</td>
+                      <td className="border p-2">{city}</td>
+                      <td className="border p-2">{Math.round(travel_time_sec / 60)}</td>
+                      <td className="border p-2">{weather || 'Unknown'}</td>
+                      <td className="border p-2">{typeof final_score === 'number' ? final_score.toFixed(2) : final_score}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
