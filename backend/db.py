@@ -17,7 +17,24 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Legacy psycopg2 connection for raw SQL (keep for compatibility)
 def get_connection():
-    return psycopg2.connect(DATABASE_URL)
+    """Get database connection with IST timezone set"""
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL environment variable not set")
+    
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        
+        # Set session timezone to IST for all operations
+        cur = conn.cursor()
+        cur.execute("SET timezone = 'Asia/Kolkata';")
+        conn.commit()
+        
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        raise
 
 # Database model
 class Delivery(Base):
